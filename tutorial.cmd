@@ -1,0 +1,1 @@
+python tools/playgame.py "java -jar MyBot.jar" "python tools/sample_bots/python/RandomBot.py" "python tools/sample_bots/python/LeftyBot.py" "python tools/sample_bots/python/HunterBot.py" --map_file tools/maps/cell_maze/cell_maze_p04_16.map --log_dir game_logs --turns 500 --scenario --player_seed 7 --verbose -e --viewradius 100
