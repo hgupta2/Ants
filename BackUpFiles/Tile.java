@@ -10,6 +10,8 @@ public class Tile implements Comparable<Tile> {
     
     private int distance;
     
+    private int exploreVal;
+    
     /**
      * Creates new {@link Tile} object.
      * 
@@ -21,6 +23,7 @@ public class Tile implements Comparable<Tile> {
         this.col = col;
         neighbors = new Tile[4];
         distance = 0;
+        exploreVal = 0;
     }
     
     /**
@@ -66,6 +69,24 @@ public class Tile implements Comparable<Tile> {
      */
     public void setdist(int dist) {
         distance = dist;
+    }
+    
+    /**
+     * Returns exploreVal.
+     * 
+     * @return distance
+     */
+    public int getExpVal() {
+        return exploreVal;
+    }
+    
+    /**
+     * Sets a new exploreValue.
+     * 
+     * @param distance
+     */
+    public void setExpVal(int value) {
+        exploreVal = value;
     }
     
     /** 
@@ -129,5 +150,6 @@ public class Tile implements Comparable<Tile> {
 	    	neighbors = newNeighbors;
     	}
     }
+    
     
 }

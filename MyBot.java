@@ -33,6 +33,7 @@ public class MyBot extends Bot {
 	 
 	/** HashMap to store position of each ant to avoid collisions */
 	private Map<Tile, Tile> orders = new HashMap<Tile, Tile>();
+	private Set<Tile> orderAnts = new HashSet<Tile>();
 
 	/** Ants object */
 	private Ants ants;
@@ -62,8 +63,8 @@ public class MyBot extends Bot {
 	private Map<Tile, Aim> antLefty = new HashMap<Tile, Aim>();
 	
 	private boolean takePath(Tile antLoc , Tile newLoc){
-		if(enemyHills.contains(newLoc)){
-			enemyHillsRazed.add(newLoc);
+		if(enemyHills.contains(antLoc)){
+			enemyHillsRazed.add(antLoc);
 			hillRazed = true;
 			//enemyHills.clear();
 		}
@@ -84,6 +85,7 @@ public class MyBot extends Bot {
 		if (ants.getIlk(newLoc).isUnoccupied() && !orders.containsKey(newLoc)) {
             ants.issueOrder(antLoc, direction);
             orders.put(newLoc, antLoc);
+            orderAnts.add(antLoc);
             return true;
 		} else {
             return false;
@@ -114,7 +116,61 @@ public class MyBot extends Bot {
 		return false;
 	}
 	
+	private Set<Tile> findSafeTiles(Set<Tile> targets){
+		Set<Tile> storeDangerTiles = new HashSet<Tile>();
+		
+		for(Tile target : targets){
+			Queue<Tile> queue = new LinkedList<Tile>();
+        	queue.add(mapTiles[target.getRow()][target.getCol()]);
+        	boolean visited[][] = new boolean[ants.getRows()][ants.getCols()];
+        	int myAntCount = 0;
+        	int enemyAntCount = 0;
+        	
+        	target.setdist(0);
+        	
+        	while(!queue.isEmpty()){
+        		Tile tile = queue.remove();
+        		visited[tile.getRow()][tile.getCol()] = true;
+        		Tile[] neighbors = tile.getNeighbors();
+        		
+        		if(tile.getdist() > 5){
+        			if((myAntCount - enemyAntCount) < 0){
+        				storeDangerTiles.add(target);
+        			}
+        			continue;
+        		}
+        		
+        		for(Tile neighbor : neighbors){
+        			if( !visited[neighbor.getRow()][neighbor.getCol()]){ 
+        				neighbor.setdist(tile.getdist()+1);
+        				visited[neighbor.getRow()][neighbor.getCol()] = true;
+        				
+        				if(myAnts.contains(neighbor)){
+        					myAntCount++;        				
+        				}else if(enemyAnts.contains(neighbor)){
+        					enemyAntCount++;
+        				}
+        					queue.add(neighbor);
+        			}
+        		}
+        	}
+		}
+		
+		for(int i=0; i<ants.getRows(); i++){
+			for(int j=0; j<ants.getCols(); j++){
+				mapTiles[i][j].setdist(0);
+			}
+		}
+		
+		for(Tile target : storeDangerTiles){
+			targets.remove(target);
+		}
+		return targets;
+	}
+	
     private void foodBFS(Set<Tile> sortedTarget, int distance){
+    	sortedTarget = findSafeTiles(sortedTarget);
+    	
     	Map<Tile, Tile> hashTargets = new HashMap<Tile, Tile>();
         TreeSet<Tile> myAnts = new TreeSet<Tile>(ants.getMyAnts());
     	
@@ -143,7 +199,7 @@ public class MyBot extends Bot {
         				if(myAnts.contains(neighbor) 
         					&& !hashTargets.containsKey(target)
                             && !hashTargets.containsValue(neighbor)
-                            && !orders.containsValue(neighbor)
+                            && !orderAnts.contains(neighbor)
                             && takePath(neighbor, tile)){
         				hashTargets.put(target, neighbor);
         				flag = true;
@@ -317,6 +373,7 @@ public class MyBot extends Bot {
     }
     
     private void enemyHillsBFS(Set<Tile> targets, int count, int distance){
+    	targets = findSafeTiles(targets);
     	
     	for(Tile target : targets){
     		boolean flag = false;
@@ -339,7 +396,7 @@ public class MyBot extends Bot {
     					visited[neighbor.getRow()][neighbor.getCol()] = true;
     					neighbor.setdist(tile.getdist()+1);
     					
-    					if(myAnts.contains(neighbor) && !orders.containsValue(neighbor) && takePath(neighbor, tile)){
+    					if(myAnts.contains(neighbor) && !orderAnts.contains(neighbor) && takePath(neighbor, tile)){
     						count--;
     						if(count <= 0){
     							flag = true;
@@ -620,7 +677,7 @@ public class MyBot extends Bot {
 		antLefty = newLefty;
     }
     
-    private void enemyAntsBFS(Set<Tile> targets){
+    private void approachEnemyBFS(Set<Tile> targets){
     	Set<Tile> targetTiles = new HashSet<Tile>();
     	
     	for(Tile target : targets){
@@ -635,7 +692,7 @@ public class MyBot extends Bot {
     			Tile tile = queue.remove();
     			visited[tile.getRow()][tile.getCol()] = true;
     			
-    			if(tile.getdist() > 5){
+    			if(tile.getdist() > 3){
     				targetTiles.add(tile);
     				continue;
     			}
@@ -664,17 +721,184 @@ public class MyBot extends Bot {
 			}
 		}
     	
-    	System.out.println(targetTiles.size() + ">>>>>>>>>>>>>>>>>");
-    	foodBFS(targetTiles, 10);
+    	//System.out.println(targetTiles.size() + ">>>>>>>>>>>>>>>>>");
+    	foodBFS(targetTiles, 15);
+    }
+    
+    private boolean safeMove(Tile myAnt, Tile enemyAnt){
+    	Queue<Tile> queue = new LinkedList<Tile>();
+		boolean[][] visited = new boolean[ants.getRows()][ants.getCols()];
+		
+		int myAntCount = 0;
+		int enemyAntCount = 0;
+		
+		queue.add(mapTiles[myAnt.getRow()][myAnt.getCol()]);
+		while(!queue.isEmpty()){
+			Tile tile = queue.remove();
+			visited[tile.getRow()][tile.getCol()] = true;
+			
+			if(tile.getdist() > 2){
+				break;
+			}
+			
+			for(Tile neighbor : tile.getNeighbors()){
+				if(!visited[neighbor.getRow()][neighbor.getCol()]){
+					visited[neighbor.getRow()][neighbor.getCol()] = true;
+					neighbor.setdist(tile.getdist()+1);
+					
+					if(myAnts.contains(neighbor)){
+						myAntCount++;
+					}
+					queue.add(neighbor);
+				}
+			}
+			
+		}
+    	
+		for(int i=0; i<ants.getRows(); i++){
+			for(int j=0; j<ants.getCols(); j++){
+				mapTiles[i][j].setdist(0);
+				visited[i][j] = false;
+			}
+		}
+		
+		queue.clear();
+		queue.add(mapTiles[enemyAnt.getRow()][enemyAnt.getCol()]);
+		while(!queue.isEmpty()){
+			Tile tile = queue.remove();
+			visited[tile.getRow()][tile.getCol()] = true;
+			
+			if(tile.getdist() > 2){
+				break;
+			}
+			
+			for(Tile neighbor : tile.getNeighbors()){
+				if(!visited[neighbor.getRow()][neighbor.getCol()]){
+					visited[neighbor.getRow()][neighbor.getCol()] = true;
+					neighbor.setdist(tile.getdist()+1);
+					
+					if(enemyAnts.contains(neighbor)){
+						enemyAntCount++;
+					}
+					queue.add(neighbor);
+				}
+			}
+			
+		}
+		
+		for(int i=0; i<ants.getRows(); i++){
+			for(int j=0; j<ants.getCols(); j++){
+				mapTiles[i][j].setdist(0);
+			}
+		}
+		
+		if((myAntCount - enemyAntCount) > 0){
+			return true;
+		}
+    	return false;
+    }
+    
+    private void attackBFS(Set<Tile> allMyAnts){
+    	HashMap<Tile, Tile> myEnemy = new HashMap<Tile, Tile>();
+    	
+    	for(Tile myAnt : allMyAnts){
+    		Queue<Tile> queue = new LinkedList<Tile>();
+    		boolean[][] visited = new boolean[ants.getRows()][ants.getCols()];
+    		
+    		queue.add(mapTiles[myAnt.getRow()][myAnt.getCol()]);
+    		myAnt.setdist(0);
+    		
+    		while(!queue.isEmpty()){
+    			Tile tile = queue.remove();
+    			visited[tile.getRow()][tile.getCol()] = true;
+    			
+    			if(tile.getdist() > 10){
+    				continue;
+    			}
+    			
+    			for(Tile neighbor : tile.getNeighbors()){
+    				if(!visited[neighbor.getRow()][neighbor.getCol()]){
+    					visited[neighbor.getRow()][neighbor.getCol()] = true;
+    					neighbor.setdist(tile.getdist()+1);
+    					
+    					if(enemyAnts.contains(neighbor)){
+    						if(myEnemy.containsKey(myAnt)){
+    							if((myEnemy.get(myAnt).getdist() > neighbor.getdist())){
+    								myEnemy.put(myAnt, neighbor);
+    							}
+    						}else{
+    							myEnemy.put(myAnt, neighbor);
+    						}
+    						
+    					}
+    					queue.add(neighbor);
+    				}
+    			}  			
+    		}
+    	}
+    	
+    	for(int i=0; i<ants.getRows(); i++){
+			for(int j=0; j<ants.getCols(); j++){
+				mapTiles[i][j].setdist(0);
+			}
+		}
+    	
+    	HashMap<Tile, Tile> finalEnemy = new HashMap<Tile, Tile>();
+    	System.out.println(myEnemy.size()+"-->>>>>>>>>>>>>>>");
+    	for(Map.Entry<Tile, Tile> entry : myEnemy.entrySet()){
+    		if(safeMove(entry.getKey(), entry.getValue())){
+    			finalEnemy.put(entry.getKey(), entry.getValue());
+    		}
+    	}
+    	
+    	for(Map.Entry<Tile, Tile> entry : finalEnemy.entrySet()){
+    		Queue<Tile> queue = new LinkedList<Tile>();
+    		boolean[][] visited = new boolean[ants.getRows()][ants.getCols()];
+    		
+    		queue.add(mapTiles[entry.getValue().getRow()][entry.getValue().getCol()]);
+    		entry.getValue().setdist(0);
+    		
+    		while(!queue.isEmpty()){
+    			Tile tile = queue.remove();
+    			visited[tile.getRow()][tile.getCol()] = true;
+    			
+    			if(tile.getdist() > 9){
+    				continue;
+    			}
+    			
+    			for(Tile neighbor : tile.getNeighbors()){
+    				if(!visited[neighbor.getRow()][neighbor.getCol()]){
+    					visited[neighbor.getRow()][neighbor.getCol()] = true;
+    					neighbor.setdist(tile.getdist()+1);
+    					
+    					if(neighbor.equals(entry.getKey())){
+    						if(takePath(neighbor, tile)){
+    							queue.clear();
+    							break;
+    						}
+    					}
+    					queue.add(neighbor);
+    				}
+    			}  			
+    		}
+    	}
+    	
+    	for(int i=0; i<ants.getRows(); i++){
+			for(int j=0; j<ants.getCols(); j++){
+				mapTiles[i][j].setdist(0);
+			}
+		}
     }
     
 	@Override
     public void doTurn() {
         ants = getAnts();
+        orders.clear();
+        orderAnts.clear();
+        
         mapTiles = ants.getMapTiles();
-		orders.clear();
 		myAnts = ants.getMyAnts();
-		//enemyAnts = ants.getEnemyHills();
+		enemyAnts = ants.getEnemyAnts();
 		myHills = ants.getMyHills();
 		//enemyHills = ants.getEnemyHills();
 		foodTiles = ants.getFoodTiles();
@@ -685,11 +909,11 @@ public class MyBot extends Bot {
         }
 		
         /** remember seen enemy ants */
-        for(Tile enemyAnt : ants.getEnemyAnts()){
+        /*for(Tile enemyAnt : ants.getEnemyAnts()){
         	if(!enemyAnts.contains(enemyAnt)){
         		enemyAnts.add(enemyAnt);
         	}
-        }
+        }*/
         
         /** remember seen enemy hills */
         for(Tile enemyHill : ants.getEnemyHills()){
@@ -699,35 +923,28 @@ public class MyBot extends Bot {
         }
         
         
-        // unblock hills
-        /*for (Tile myHill : ants.getMyHills()) {
-            if (ants.getMyAnts().contains(myHill) && !orders.containsValue(myHill)) {
-                //for (Aim direction : Aim.values()) {
-                    if (takeRandomPath(ants)) {
-                        break;
-                    }
-                //}
-            }
-        }*/
-		
-		//Init mapTiles explore values
+        //Init mapTiles explore values
 		incExploreValue();
 		
 		//Explore Seen Area within 10 steps
         initExplore();
         
 		//Attack Enemy Hills
-      	enemyHillsBFS(enemyHills, myAnts.size() < 10 ? 1 : 2, 20);
+      	enemyHillsBFS(enemyHills, myAnts.size() < 10 ? 1 : 2, 15);
 		
       	// find close food
         foodBFS(foodTiles, 15);
         
-        //attack enemy ants
-        enemyAntsBFS(enemyAnts);
+        //Attack Enemy Ants
+        attackBFS(myAnts);
+        //enemyHillsBFS(enemyAnts, myAnts.size() < 30 ? 2 : 4, 10);
+        
+        //aprroach enemy ants
+        approachEnemyBFS(enemyAnts);
         
         //Explore unseen area
         for(Tile myAnt : myAnts){
-        	if(!orders.containsValue(myAnt)){
+        	if(!orderAnts.contains(myAnt)){
         		exploreBFS(myAnt);
         	}
         }
